@@ -1,0 +1,76 @@
+version: "3.8"
+services:
+    
+    # KeyCloak Auth Service
+    keycloak:
+      build:
+        context: .
+        dockerfile: keycloak/Dockerfile
+      container_name: demo-keycloak
+      environment:
+        DB_VENDOR: POSTGRES
+        DB_ADDR: postgres 
+        KEYCLOAK_USER: admin
+        KEYCLOAK_PASSWORD: admin
+        DB_USER: keycloak
+        DB_PASSWORD: admin
+      ports:
+        - 8080:8080
+      depends_on:
+        - postgres
+      restart: always
+      networks:
+        - keycloak-network
+    
+    # Database for KeyCloak Auth Service
+    postgres:
+      image: postgres:latest
+      container_name: postgres
+      environment:
+        POSTGRES_DB: keycloak
+        POSTGRES_USER: keycloak
+        POSTGRES_PASSWORD: admin
+      ports:
+        - 3307:3306
+      volumes:
+        - ./postgres-data:/var/lib/postgresql/data
+      restart: always
+      networks:
+        - keycloak-network
+    
+    # LDAP Service for federated Users
+    ldap:
+      build:
+        context: ./ldap
+        dockerfile: Dockerfile
+      container_name: demo-ldap
+      depends_on:
+        - keycloak
+      networks:
+        - keycloak-network
+    
+    # Simple Mail Service for User Validation 
+    mail:
+      image: mailhog/mailhog
+      container_name: demo-mail
+      ports:
+        - 8025:8025
+      depends_on:
+        - ldap
+      networks:
+        - keycloak-network
+
+    # Sample Application Client for JWT Testing
+    js-console:
+      build:
+        context: ./js-console
+        dockerfile: Dockerfile
+      ports:
+        - 8000:80
+      depends_on:
+        - mail
+      networks:
+        - keycloak-network
+
+networks:
+  keycloak-network:
